@@ -28,8 +28,6 @@ import java.io.IOException;
 import loci.formats.FormatException;
 import loci.formats.FormatWriter;
 import loci.formats.meta.MetadataRetrieve;
-import loci.formats.out.TiffWriter;
-import loci.formats.tiff.IFD;
 
 import omero.ServerError;
 import omero.api.RawPixelsStorePrx;
@@ -78,6 +76,13 @@ public class LocalPixels {
                 metadata.getPixelsSizeT(0).getValue(),
                 tileSize.width, tileSize.height,
                 metadata.getPixelsDimensionOrder(0).getValue());
+    }
+
+    /**
+     * @return the tile size for the image
+     */
+    public Dimension getTileSize() {
+      return tileSize;
     }
 
     /**
@@ -148,7 +153,7 @@ public class LocalPixels {
      * @throws ServerError if the pixels ID could not be obtained
      */
     public void writeTiles(FormatWriter writer) throws FormatException, IOException, ServerError {
-        System.out.print("assembling pixels " + rps.getPixelsId() + "..");
+        System.out.print("assembling pixels " + rps.getPixelsId() + " into " +  writer.getFormat() + " format..");
         System.out.flush();
         final FileIO tileIO = new FileIO(tileFile, false);
         final int[] tileSizes = new int[tileIO.readInt()];
@@ -158,24 +163,13 @@ public class LocalPixels {
         int tileNumber = 0;
         int planeIndex = -1;
         TileIterator.Tile previousTile = null;
-        IFD ifd = null;
         for (final TileIterator.Tile tile : tiles) {
             if (!tile.isSamePlane(previousTile)) {
                 previousTile = tile;
                 planeIndex++;
-                if (writer instanceof TiffWriter) {
-                    /* TiffWriter requires an IFD for each plane of tiled writing */
-                    ifd = new IFD();
-                    ifd.put(IFD.TILE_WIDTH, tileSize.width);
-                    ifd.put(IFD.TILE_LENGTH, tileSize.height);
-                }
             }
             final byte[] pixels = tileIO.readBytes(tileSizes[tileNumber]);
-            if (writer instanceof TiffWriter) {
-                ((TiffWriter) writer).saveBytes(planeIndex, pixels, ifd, tile.x, tile.y, tile.w, tile.h);
-            } else {
-                writer.saveBytes(planeIndex, pixels, tile.x, tile.y, tile.w, tile.h);
-            }
+            writer.saveBytes(planeIndex, pixels, tile.x, tile.y, tile.w, tile.h);
             if (tileNumber % TILES_PER_DOT == 0) {
                 System.out.print('.');
                 System.out.flush();

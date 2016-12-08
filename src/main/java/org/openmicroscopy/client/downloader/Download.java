@@ -30,6 +30,7 @@ import com.google.common.collect.Ordering;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 
+import java.awt.Dimension;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -687,12 +688,18 @@ public class Download {
                         System.out.print(countPrefix);
                         final File tiffFile = tiffFileAndWriter.getKey();
                         final TiffWriter writer = tiffFileAndWriter.getValue();
+                        writer.setMetadataRetrieve(metadata);
                         if (isBigTiff) {
                             /* Downloaded tiles are over 3GB so resulting TIFF may be larger still. */
                             writer.setBigTiff(true);
                         }
+                        final Dimension tileSize = localPixels.getTileSize();
+                        if (writer.setTileSizeX(tileSize.width) != tileSize.width ||
+                                writer.setTileSizeY(tileSize.height) != tileSize.height) {
+                            LOGGER.fatal(null, "cannot set tile size of image writer for " + writer.getFormat() + " format");
+                            abortOnFatalError(3);
+                        }
                         writer.setCompression(TiffWriter.COMPRESSION_ZLIB);
-                        writer.setMetadataRetrieve(metadata);
                         writer.setWriteSequentially(true);
                         writer.setId(tiffFile.getPath());
                         localPixels.writeTiles(writer);
